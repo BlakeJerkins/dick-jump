@@ -400,6 +400,17 @@ function update() {
         player.y = 450;
         player.body.setVelocity(0, 0);
         
+        // Regenerate coins on all platforms
+        coins.children.entries.forEach(coin => coin.destroy());
+        coins.clear();
+        platforms.children.entries.forEach(platform => {
+            if (Math.random() < 0.4) {
+                const coin = coins.create(platform.x, platform.y - 40, 'coinTexture');
+                coin.coinId = Math.random();
+                coin.body.setGravityY(-300);
+            }
+        });
+        
         // Allow respawn again after a short delay
         this.time.delayedCall(500, () => {
             canRespawn = true;
