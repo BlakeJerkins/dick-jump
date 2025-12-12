@@ -42,6 +42,9 @@ let bullets; // bullet group
 let fireCooldown = 250; // ms between shots
 let lastFireTime = 0;
 let enemies; // enemy group
+// Spawn tuning
+const COIN_SPAWN_CHANCE = 0.40;    // 40% of platforms have a coin
+const ENEMY_SPAWN_CHANCE = 0.20;   // 20% of platforms have an enemy (lower than coins)
 
 function preload() {
     // Load any assets if needed
@@ -405,14 +408,14 @@ function generateNextPlatform(scene) {
     platformDistance = randomDistance;
     
     // Randomly add a coin on some platforms
-    if (Math.random() < 0.4) {
+    if (Math.random() < COIN_SPAWN_CHANCE) {
         const coin = coins.create(platformX, platformY - 40, 'coinTexture');
         coin.coinId = Math.random();
         coin.body.setGravityY(-300);
     }
 
     // Occasionally add an enemy that patrols on the platform
-    if (Math.random() < 0.35) {
+    if (Math.random() < ENEMY_SPAWN_CHANCE) {
         const enemy = enemies.create(platformX - (newPlatform.displayWidth / 4), platformY - 18, 'enemyTexture');
         enemy.body.setCollideWorldBounds(false);
         enemy.body.setVelocityX(60);
