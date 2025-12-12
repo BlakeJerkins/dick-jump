@@ -123,6 +123,10 @@ function create() {
     player = this.add.sprite(100, 450, 'playerTexture');
     this.physics.add.existing(player);
     player.body.setBounce(0);
+    // Tighten player hitbox to better match visible sprite
+    // Smaller width/height and offset to center on shaft/head area
+    player.body.setSize(20, 40);
+    player.body.setOffset(6, 4);
     
     // Create coin texture (gold condom wrapper)
     const coinGraphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -295,6 +299,20 @@ function create() {
                     coin.body.setGravityY(-300);
                 }
             });
+            // Regenerate enemies on platforms similar to coins
+            enemies.children.entries.forEach(e => e.destroy());
+            enemies.clear();
+            platforms.children.entries.forEach(newPlatform => {
+                if (Math.random() < ENEMY_SPAWN_CHANCE) {
+                    const platformHalfWidth = newPlatform.displayWidth / 2;
+                    const enemySpawnX = newPlatform.x - platformHalfWidth + 15;
+                    const enemy = enemies.create(enemySpawnX, newPlatform.y - 44, 'enemyTexture');
+                    enemy.body.setCollideWorldBounds(false);
+                    enemy.body.setVelocityX(60);
+                    enemy.patrolLeft = newPlatform.x - platformHalfWidth + 10;
+                    enemy.patrolRight = newPlatform.x + platformHalfWidth - 10;
+                }
+            });
             this.time.delayedCall(500, () => { canRespawn = true; });
         }
     });
@@ -368,6 +386,20 @@ function create() {
                     const coin = coins.create(p.x, p.y - 40, 'coinTexture');
                     coin.coinId = Math.random();
                     coin.body.setGravityY(-300);
+                }
+            });
+            // Regenerate enemies
+            enemies.children.entries.forEach(e => e.destroy());
+            enemies.clear();
+            platforms.children.entries.forEach(newPlatform => {
+                if (Math.random() < ENEMY_SPAWN_CHANCE) {
+                    const platformHalfWidth = newPlatform.displayWidth / 2;
+                    const enemySpawnX = newPlatform.x - platformHalfWidth + 15;
+                    const enemy = enemies.create(enemySpawnX, newPlatform.y - 44, 'enemyTexture');
+                    enemy.body.setCollideWorldBounds(false);
+                    enemy.body.setVelocityX(60);
+                    enemy.patrolLeft = newPlatform.x - platformHalfWidth + 10;
+                    enemy.patrolRight = newPlatform.x + platformHalfWidth - 10;
                 }
             });
             this.time.delayedCall(500, () => { canRespawn = true; });
@@ -600,6 +632,20 @@ function update() {
                 coin.body.setGravityY(-300);
             }
         });
+        // Regenerate enemies on all platforms
+        enemies.children.entries.forEach(e => e.destroy());
+        enemies.clear();
+        platforms.children.entries.forEach(newPlatform => {
+            if (Math.random() < ENEMY_SPAWN_CHANCE) {
+                const platformHalfWidth = newPlatform.displayWidth / 2;
+                const enemySpawnX = newPlatform.x - platformHalfWidth + 15;
+                const enemy = enemies.create(enemySpawnX, newPlatform.y - 44, 'enemyTexture');
+                enemy.body.setCollideWorldBounds(false);
+                enemy.body.setVelocityX(60);
+                enemy.patrolLeft = newPlatform.x - platformHalfWidth + 10;
+                enemy.patrolRight = newPlatform.x + platformHalfWidth - 10;
+            }
+        });
         
         // Allow respawn again after a short delay
         this.time.delayedCall(500, () => {
@@ -663,6 +709,12 @@ function fireEnemyBullet(enemy, scene) {
     bullet.setActive(true);
     bullet.setVisible(true);
     bullet.body.allowGravity = false;
+    // Shrink enemy bullet hitbox to be less punishing than texture size
+    if (bullet.body && bullet.body.setCircle) {
+        bullet.body.setCircle(6);
+        // Center the smaller circle within the 15x15 texture
+        bullet.body.setOffset(4, 4);
+    }
     bullet.body.setVelocity(velocityX, velocityY);
     bullet.setDepth(50);
     
