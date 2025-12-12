@@ -41,6 +41,7 @@ let platformSizeMultiplier = 1.0;  // Starts at 100%, decreases with coins (min 
 let bullets; // bullet group
 let fireCooldown = 250; // ms between shots
 let lastFireTime = 0;
+let enemies; // enemy group
 
 function preload() {
     // Load any assets if needed
@@ -190,6 +191,14 @@ function create() {
         defaultKey: 'bulletTexture',
         maxSize: 50
     });
+
+    // Enemies (pink blocks)
+    const enemyGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    enemyGraphics.fillStyle(0xff69b4, 1); // pink
+    enemyGraphics.fillRect(0, 0, 20, 16);
+    enemyGraphics.generateTexture('enemyTexture', 20, 16);
+    enemyGraphics.destroy();
+    enemies = this.physics.add.group();
     
     // Create initial platforms
     platforms.create(100, 500, 'platformMedium');
@@ -211,7 +220,14 @@ function create() {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    const keyE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    // Shooting via mouse click
+    this.input.on('pointerdown', () => {
+        const now = this.time.now;
+        if (now - lastFireTime >= fireCooldown) {
+            lastFireTime = now;
+            shootBullet.call(this);
+        }
+    });
     
     // UI
     coinsText = this.add.text(16, 50, 'Coins: 0', {
@@ -239,6 +255,40 @@ function create() {
     this.physics.add.overlap(bullets, coins, (bullet, coin) => {
         collectCoin(player, coin);
         bullet.destroy();
+    });
+
+    // Bullet-enemy overlap: bullets kill enemies
+    this.physics.add.overlap(bullets, enemies, (bullet, enemy) => {
+        bullet.destroy();
+        enemy.destroy();
+    });
+
+    // Player-enemy collision: death
+    this.physics.add.collider(player, enemies, () => {
+        // emulate fall death
+        if (canRespawn) {
+            canRespawn = false;
+            if (coinsCollected > 0) submitScore(coinsCollected);
+            coinsCollected = 0;
+            collectedCoins.clear();
+            coinsText.setText('Coins: 0');
+            platformSizeMultiplier = 1.0;
+            jumpsRemaining = 2;
+            player.x = 100;
+            player.y = 450;
+            player.body.setVelocity(0, 0);
+            // Regenerate coins
+            coins.children.entries.forEach(c => c.destroy());
+            coins.clear();
+            platforms.children.entries.forEach(p => {
+                if (Math.random() < 0.4) {
+                    const coin = coins.create(p.x, p.y - 40, 'coinTexture');
+                    coin.coinId = Math.random();
+                    coin.body.setGravityY(-300);
+                }
+            });
+            this.time.delayedCall(500, () => { canRespawn = true; });
+        }
     });
     
     // Camera follow player with horizontal bounds
@@ -360,6 +410,15 @@ function generateNextPlatform(scene) {
         coin.coinId = Math.random();
         coin.body.setGravityY(-300);
     }
+
+    // Occasionally add an enemy that patrols on the platform
+    if (Math.random() < 0.35) {
+        const enemy = enemies.create(platformX - (newPlatform.displayWidth / 4), platformY - 18, 'enemyTexture');
+        enemy.body.setCollideWorldBounds(false);
+        enemy.body.setVelocityX(60);
+        enemy.patrolLeft = platformX - (newPlatform.displayWidth / 2) + 10;
+        enemy.patrolRight = platformX + (newPlatform.displayWidth / 2) - 10;
+    }
 }
 
 function update() {
@@ -411,16 +470,7 @@ function update() {
     if (!spaceJustPressed) {
         spacePressed = false;
     }
-
-    // Shooting with E key
-    const eKey = this.input.keyboard.keys[Phaser.Input.Keyboard.KeyCodes.E];
-    if (eKey && eKey.isDown) {
-        const now = this.time.now;
-        if (now - lastFireTime >= fireCooldown) {
-            lastFireTime = now;
-            shootBullet.call(this);
-        }
-    }
+    // Mouse click shooting handled via input listener in create()
     
     // Generate new platforms as player moves forward
     if (player.x > lastPlatformX - 400) {
@@ -462,6 +512,15 @@ function update() {
             canRespawn = true;
         });
     }
+
+    // Enemy patrol update
+    enemies.children.entries.forEach(enemy => {
+        if (enemy.x <= enemy.patrolLeft) {
+            enemy.body.setVelocityX(60);
+        } else if (enemy.x >= enemy.patrolRight) {
+            enemy.body.setVelocityX(-60);
+        }
+    });
 }
 
 function collectCoin(player, coin) {
