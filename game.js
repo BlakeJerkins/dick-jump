@@ -38,6 +38,9 @@ let worldX = 0;
 let lastPlatformX = 200;
 let platformDistance = 0;
 let platformSizeMultiplier = 1.0;  // Starts at 100%, decreases with coins (min 5%)
+let bullets; // bullet group
+let fireCooldown = 250; // ms between shots
+let lastFireTime = 0;
 
 function preload() {
     // Load any assets if needed
@@ -89,6 +92,17 @@ function create() {
     playerGraphics.fillStyle(0x000000, 1);
     playerGraphics.fillCircle(14, 12, 1.5);
     playerGraphics.fillCircle(18, 12, 1.5);
+    
+    // Draw a small pixel glock (black) attached to the right side
+    // handle
+    playerGraphics.fillRect(22, 22, 3, 6);
+    // trigger guard
+    playerGraphics.fillRect(21, 22, 2, 2);
+    // slide/barrel
+    playerGraphics.fillRect(20, 18, 10, 4);
+    // muzzle highlight
+    playerGraphics.fillStyle(0x444444, 1);
+    playerGraphics.fillRect(29, 18, 1, 4);
     
     playerGraphics.generateTexture('playerTexture', 32, 48);
     playerGraphics.destroy();
@@ -161,6 +175,17 @@ function create() {
     
     // Coins
     coins = this.physics.add.group();
+
+    // Bullets (white)
+    const bulletGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    bulletGraphics.fillStyle(0xffffff, 1);
+    bulletGraphics.fillRect(0, 0, 6, 2);
+    bulletGraphics.generateTexture('bulletTexture', 6, 2);
+    bulletGraphics.destroy();
+    bullets = this.physics.add.group({
+        defaultKey: 'bulletTexture',
+        maxSize: 50
+    });
     
     // Create initial platforms
     platforms.create(100, 500, 'platformMedium');
@@ -182,6 +207,7 @@ function create() {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    const keyE = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     
     // UI
     coinsText = this.add.text(16, 50, 'Coins: 0', {
@@ -204,6 +230,12 @@ function create() {
     
     // Fetch global high score from server
     fetchGlobalHighScore();
+
+    // Bullet-coin overlap: bullets collect coins
+    this.physics.add.overlap(bullets, coins, (bullet, coin) => {
+        collectCoin(player, coin);
+        bullet.destroy();
+    });
     
     // Camera follow player with horizontal bounds
     this.cameras.main.startFollow(player);
@@ -375,6 +407,16 @@ function update() {
     if (!spaceJustPressed) {
         spacePressed = false;
     }
+
+    // Shooting with E key
+    const eKey = this.input.keyboard.keys[Phaser.Input.Keyboard.KeyCodes.E];
+    if (eKey && eKey.isDown) {
+        const now = this.time.now;
+        if (now - lastFireTime >= fireCooldown) {
+            lastFireTime = now;
+            shootBullet.call(this);
+        }
+    }
     
     // Generate new platforms as player moves forward
     if (player.x > lastPlatformX - 400) {
@@ -428,6 +470,22 @@ function collectCoin(player, coin) {
         // Reduce platform size by 1% per coin collected (minimum 5%)
         platformSizeMultiplier = Math.max(0.05, 1.0 - (coinsCollected * 0.01));
     }
+}
+
+function shootBullet() {
+    if (!bullets) return;
+    const bullet = bullets.get(player.x + 20, player.y - 10, 'bulletTexture');
+    if (!bullet) return;
+    bullet.setActive(true);
+    bullet.setVisible(true);
+    bullet.body.allowGravity = false;
+    bullet.body.setVelocityX(500);
+    bullet.setDepth(50);
+    
+    // Auto-destroy after 1500ms
+    this.time.delayedCall(1500, () => {
+        if (bullet.active) bullet.destroy();
+    });
 }
 
 function winGame(player, flag) {
