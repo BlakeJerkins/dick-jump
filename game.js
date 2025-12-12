@@ -201,36 +201,36 @@ function create() {
     enemyGraphics.fillStyle(0xff1493, 1); // deep pink
     enemyGraphics.beginPath();
     enemyGraphics.moveTo(10, 0);     // top point
-    enemyGraphics.lineTo(2, 12);     // left side
-    enemyGraphics.lineTo(4, 28);     // left bottom
-    enemyGraphics.lineTo(10, 32);    // bottom center
-    enemyGraphics.lineTo(16, 28);    // right bottom
-    enemyGraphics.lineTo(18, 12);    // right side
+    enemyGraphics.lineTo(2, 16);     // left side
+    enemyGraphics.lineTo(4, 36);     // left bottom
+    enemyGraphics.lineTo(10, 44);    // bottom center
+    enemyGraphics.lineTo(16, 36);    // right bottom
+    enemyGraphics.lineTo(18, 16);    // right side
     enemyGraphics.closePath();
     enemyGraphics.fill();
     
     // Inner fold - darker pink for contrast
     enemyGraphics.fillStyle(0xff69b4, 1);
     enemyGraphics.beginPath();
-    enemyGraphics.moveTo(10, 8);
-    enemyGraphics.lineTo(7, 16);
-    enemyGraphics.lineTo(8, 24);
-    enemyGraphics.lineTo(10, 28);
-    enemyGraphics.lineTo(12, 24);
-    enemyGraphics.lineTo(13, 16);
+    enemyGraphics.moveTo(10, 10);
+    enemyGraphics.lineTo(7, 20);
+    enemyGraphics.lineTo(8, 32);
+    enemyGraphics.lineTo(10, 38);
+    enemyGraphics.lineTo(12, 32);
+    enemyGraphics.lineTo(13, 20);
     enemyGraphics.closePath();
     enemyGraphics.fill();
     
     // Left and right lips
     enemyGraphics.fillStyle(0xdb7093, 1); // pale violet red
     enemyGraphics.beginPath();
-    enemyGraphics.arc(4, 18, 2.5, 0, Math.PI * 2);
+    enemyGraphics.arc(4, 22, 2.5, 0, Math.PI * 2);
     enemyGraphics.fill();
     enemyGraphics.beginPath();
-    enemyGraphics.arc(16, 18, 2.5, 0, Math.PI * 2);
+    enemyGraphics.arc(16, 22, 2.5, 0, Math.PI * 2);
     enemyGraphics.fill();
     
-    enemyGraphics.generateTexture('enemyTexture', 20, 32);
+    enemyGraphics.generateTexture('enemyTexture', 20, 44);
     enemyGraphics.destroy();
     enemies = this.physics.add.group();
     
@@ -450,7 +450,7 @@ function generateNextPlatform(scene) {
     if (Math.random() < ENEMY_SPAWN_CHANCE) {
         const platformHalfWidth = newPlatform.displayWidth / 2;
         const enemySpawnX = platformX - platformHalfWidth + 15;  // Spawn well within platform bounds
-        const enemy = enemies.create(enemySpawnX, platformY - 32, 'enemyTexture');  // Adjusted Y for taller enemy
+        const enemy = enemies.create(enemySpawnX, platformY - 44, 'enemyTexture');  // Adjusted Y for taller enemy
         enemy.body.setCollideWorldBounds(false);
         enemy.body.setVelocityX(60);
         // Set patrol bounds to stay within platform
