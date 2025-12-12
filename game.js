@@ -42,6 +42,7 @@ let bullets; // bullet group
 let fireCooldown = 250; // ms between shots
 let lastFireTime = 0;
 let enemies; // enemy group
+let enemyBullets; // enemy bullet group
 // Spawn tuning
 const COIN_SPAWN_CHANCE = 0.40;    // 40% of platforms have a coin
 const ENEMY_SPAWN_CHANCE = 0.20;   // 20% of platforms have an enemy (lower than coins)
@@ -230,9 +231,27 @@ function create() {
     enemyGraphics.arc(16, 22, 2.5, 0, Math.PI * 2);
     enemyGraphics.fill();
     
+    // Draw guns on enemies (silver, left and right sides)
+    enemyGraphics.fillStyle(0xC0C0C0, 1); // silver
+    // Left gun
+    enemyGraphics.fillRect(0, 18, 4, 2);
+    // Right gun
+    enemyGraphics.fillRect(16, 18, 4, 2);
+    
     enemyGraphics.generateTexture('enemyTexture', 20, 44);
     enemyGraphics.destroy();
     enemies = this.physics.add.group();
+    
+    // Enemy bullets (red, smaller than player bullets)
+    const enemyBulletGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    enemyBulletGraphics.fillStyle(0xff0000, 1); // red
+    enemyBulletGraphics.fillRect(0, 0, 5, 2);
+    enemyBulletGraphics.generateTexture('enemyBulletTexture', 5, 2);
+    enemyBulletGraphics.destroy();
+    enemyBullets = this.physics.add.group({
+        defaultKey: 'enemyBulletTexture',
+        maxSize: 100
+    });
     
     // Create initial platforms
     platforms.create(100, 500, 'platformMedium');
@@ -249,6 +268,32 @@ function create() {
     this.physics.add.collider(coins, platforms);
     this.physics.add.collider(enemies, platforms);  // Enemies stay on platforms
     this.physics.add.overlap(player, coins, collectCoin, null, this);
+    
+    // Enemy bullets hit player (death)
+    this.physics.add.overlap(player, enemyBullets, () => {
+        if (canRespawn) {
+            canRespawn = false;
+            if (coinsCollected > 0) submitScore(coinsCollected);
+            coinsCollected = 0;
+            collectedCoins.clear();
+            coinsText.setText('Coins: 0');
+            platformSizeMultiplier = 1.0;
+            jumpsRemaining = 2;
+            player.x = 100;
+            player.y = 450;
+            player.body.setVelocity(0, 0);
+            coins.children.entries.forEach(c => c.destroy());
+            coins.clear();
+            platforms.children.entries.forEach(p => {
+                if (Math.random() < 0.4) {
+                    const coin = coins.create(p.x, p.y - 40, 'coinTexture');
+                    coin.coinId = Math.random();
+                    coin.body.setGravityY(-300);
+                }
+            });
+            this.time.delayedCall(500, () => { canRespawn = true; });
+        }
+    });
     
     // Input
     cursors = this.input.keyboard.createCursorKeys();
@@ -551,13 +596,68 @@ function update() {
         });
     }
 
-    // Enemy patrol update
+    // Enemy patrol and shooting update
     enemies.children.entries.forEach(enemy => {
+        // Patrol behavior
         if (enemy.x <= enemy.patrolLeft) {
             enemy.body.setVelocityX(60);
         } else if (enemy.x >= enemy.patrolRight) {
             enemy.body.setVelocityX(-60);
         }
+        
+        // Shooting behavior - fire if player is within range
+        updateEnemyShooting(enemy, this);
+    });
+}
+
+function updateEnemyShooting(enemy, scene) {
+    // Initialize shooting cooldown if not set
+    if (!enemy.lastShotTime) {
+        enemy.lastShotTime = 0;
+        enemy.shootCooldown = 800; // ms between enemy shots
+    }
+    
+    // Check if player is within range (detect within ~300 pixels)
+    const distToPlayer = Phaser.Math.Distance.Between(enemy.x, enemy.y, player.x, player.y);
+    const detectionRange = 300;
+    
+    if (distToPlayer < detectionRange) {
+        const now = scene.time.now;
+        
+        // Fire if cooldown is ready
+        if (now - enemy.lastShotTime >= enemy.shootCooldown) {
+            enemy.lastShotTime = now;
+            fireEnemyBullet(enemy, scene);
+        }
+    }
+}
+
+function fireEnemyBullet(enemy, scene) {
+    // Determine direction toward player
+    const dx = player.x - enemy.x;
+    const dy = player.y - enemy.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance === 0) return;
+    
+    // Normalize and apply bullet velocity
+    const speed = 250;
+    const velocityX = (dx / distance) * speed;
+    const velocityY = (dy / distance) * speed;
+    
+    // Create bullet at enemy position
+    const bullet = enemyBullets.get(enemy.x, enemy.y, 'enemyBulletTexture');
+    if (!bullet) return;
+    
+    bullet.setActive(true);
+    bullet.setVisible(true);
+    bullet.body.allowGravity = false;
+    bullet.body.setVelocity(velocityX, velocityY);
+    bullet.setDepth(50);
+    
+    // Auto-destroy after 2000ms
+    scene.time.delayedCall(2000, () => {
+        if (bullet.active) bullet.destroy();
     });
 }
 
