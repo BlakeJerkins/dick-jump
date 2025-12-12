@@ -52,6 +52,7 @@ let bossSpawned = false;
 let bossDefeated = false;
 let bossHealthBarBg;
 let bossHealthBarFill;
+let bossHealthLabel;
 let bossHP = 0;
 let bossMaxHP = 100;
 let portal; // portal to next level
@@ -402,7 +403,11 @@ function create() {
         if (!bullet || !bullet.active) return;
         bullet.destroy();
         if (enemy && enemy.isBoss) {
-            enemy.hp -= 1;
+            console.log('Boss hit! Current HP:', enemy.hp, 'Max HP:', bossMaxHP);
+            const current = Number.isFinite(enemy.hp) ? enemy.hp : bossMaxHP;
+            enemy.hp = Math.max(0, current - 1);
+            bossHP = enemy.hp;
+            console.log('Boss HP after damage:', enemy.hp);
             updateBossHealthBar();
             if (enemy.hp <= 0) {
                 handleBossDefeat.call(this, enemy);
@@ -854,21 +859,20 @@ function spawnBoss(scene) {
 
     const platformHalfWidth = bossPlatWidth / 2;
     const spawnX = bossPlatform.x;
-    const spawnY = bossPlatform.y - 30;
+    const spawnY = bossPlatform.y - 175;
     boss = enemies.create(spawnX, spawnY, 'enemyTexture');
     boss.setScale(4);
     boss.isBoss = true;
     boss.hp = bossMaxHP;
+    console.log('Boss created:', boss, 'isBoss:', boss.isBoss, 'HP:', boss.hp);
     boss.body.setBounce(0);
-    boss.body.setCollideWorldBounds(false);
+    boss.body.setCollideWorldBounds(true);
     boss.body.setVelocityX(60);
     boss.patrolLeft = bossPlatform.x - platformHalfWidth + 20;
     boss.patrolRight = bossPlatform.x + platformHalfWidth - 20;
-    // Set hitbox to match the visible enemy sprite scaled by 4
-    // Enemy sprite is 20x44, scaled 4x = 80x176
-    // Center the hitbox on the sprite origin
-    boss.body.setSize(80, 176);
-    boss.body.setOffset(-40, -88);
+    // Reset hitbox to default - let Phaser handle it naturally
+    boss.body.setSize(20, 44);
+    boss.body.setOffset(0, 0);
     // Initialize boss HP and 2 second delay before first shot
     boss.hp = bossMaxHP;
     boss.lastShotTime = scene.time.now + 2000;
@@ -886,6 +890,10 @@ function spawnBoss(scene) {
 
 function updateBoss(bossEntity, scene) {
     if (!bossEntity.active) return;
+    if (bossEntity.hp !== undefined && bossEntity.hp <= 0) {
+        handleBossDefeat(scene, bossEntity);
+        return;
+    }
     if (bossEntity.x <= bossEntity.patrolLeft) {
         bossEntity.x = bossEntity.patrolLeft;
         bossEntity.body.setVelocityX(80);
@@ -933,37 +941,58 @@ function fireBossShotgun(bossEntity, scene) {
 function createBossHealthBar(scene) {
     if (bossHealthBarBg) bossHealthBarBg.destroy();
     if (bossHealthBarFill) bossHealthBarFill.destroy();
-    const barX = scene.cameras.main.width - 220;
+    if (bossHealthLabel) bossHealthLabel.destroy();
+    const barLeft = scene.cameras.main.width - 340; // 240px wide bar, leaving 100px margin
     const barY = 50;
-    bossHealthBarBg = scene.add.rectangle(barX, barY, 240, 24, 0x550000);
-    bossHealthBarFill = scene.add.rectangle(barX, barY, 240, 24, 0xff0000);
+    bossHealthBarBg = scene.add.rectangle(barLeft, barY, 240, 24, 0xffffff);
+    bossHealthBarFill = scene.add.rectangle(barLeft, barY, 240, 24, 0xff0000);
+    bossHealthBarBg.setOrigin(0, 0.5);
+    bossHealthBarFill.setOrigin(0, 0.5);
+    bossHealthLabel = scene.add.text(barLeft + 120, barY - 30, 'BOSS HEALTH', {
+        fontSize: '16px',
+        fill: '#ffffff',
+        fontFamily: 'Arial'
+    });
+    bossHealthLabel.setOrigin(0.5, 0.5);
+    console.log('Boss health bar created:', bossHealthBarBg, bossHealthBarFill);
     bossHealthBarBg.setScrollFactor(0);
     bossHealthBarFill.setScrollFactor(0);
+    bossHealthLabel.setScrollFactor(0);
     bossHealthBarBg.setDepth(100);
     bossHealthBarFill.setDepth(101);
+    bossHealthLabel.setDepth(102);
     updateBossHealthBar();
 }
 
 function updateBossHealthBar() {
     if (!bossHealthBarFill || !bossHealthBarBg || bossMaxHP <= 0) return;
     const pct = Phaser.Math.Clamp(bossHP / bossMaxHP, 0, 1);
+    console.log('Updating health bar - bossHP:', bossHP, 'bossMaxHP:', bossMaxHP, 'pct:', pct, 'displayWidth:', 240 * pct);
     bossHealthBarFill.displayWidth = 240 * pct;
     bossHealthBarFill.visible = bossSpawned && bossHP > 0;
     bossHealthBarBg.visible = bossSpawned && bossHP > 0;
+    if (bossHealthLabel) bossHealthLabel.visible = bossSpawned && bossHP > 0;
 }
 
 function handleBossDefeat(scene, bossEntity) {
-    if (bossEntity && bossEntity.active) bossEntity.destroy();
+    const sc = scene || (bossEntity && bossEntity.scene);
+    if (bossEntity && bossEntity.active) {
+        bossEntity.disableBody(true, true);
+        bossEntity.destroy();
+    }
     boss = null;
     bossDefeated = true;
     bossSpawned = false;
     stopPlatformGeneration = true;
     if (bossHealthBarBg) { bossHealthBarBg.destroy(); bossHealthBarBg = null; }
     if (bossHealthBarFill) { bossHealthBarFill.destroy(); bossHealthBarFill = null; }
-    spawnPortal(scene);
+    if (bossHealthLabel) { bossHealthLabel.destroy(); bossHealthLabel = null; }
+    if (sc) spawnPortal(sc);
 }
 
 function spawnPortal(scene) {
+    if (!scene || !scene.physics) return;
+    const sc = scene;
     const targetPlatform = platforms.children.entries.reduce((best, p) => {
         if (!best) return p;
         return Math.abs(p.x - player.x) < Math.abs(best.x - player.x) ? p : best;
@@ -971,11 +1000,11 @@ function spawnPortal(scene) {
     const portalX = targetPlatform ? targetPlatform.x + 120 : player.x + 150;
     const portalY = targetPlatform ? targetPlatform.y - 40 : 420;
     if (portal) portal.destroy();
-    portal = scene.physics.add.sprite(portalX, portalY, 'portalTexture');
+    portal = sc.physics.add.sprite(portalX, portalY, 'portalTexture');
     portal.body.setAllowGravity(false);
     portal.setDepth(90);
-    scene.physics.add.overlap(player, portal, () => {
-        goToNextLevel(scene);
+    sc.physics.add.overlap(player, portal, () => {
+        goToNextLevel(sc);
     });
 }
 
@@ -988,6 +1017,7 @@ function resetBossState(scene) {
     if (portal) { portal.destroy(); portal = null; }
     if (bossHealthBarBg) { bossHealthBarBg.destroy(); bossHealthBarBg = null; }
     if (bossHealthBarFill) { bossHealthBarFill.destroy(); bossHealthBarFill = null; }
+    if (bossHealthLabel) { bossHealthLabel.destroy(); bossHealthLabel = null; }
 }
 
 function goToNextLevel(scene) {
@@ -996,6 +1026,7 @@ function goToNextLevel(scene) {
     if (portal) { portal.destroy(); portal = null; }
     if (bossHealthBarBg) { bossHealthBarBg.destroy(); bossHealthBarBg = null; }
     if (bossHealthBarFill) { bossHealthBarFill.destroy(); bossHealthBarFill = null; }
+    if (bossHealthLabel) { bossHealthLabel.destroy(); bossHealthLabel = null; }
     enemies.clear(true, true);
     enemyBullets.clear(true, true);
     coins.clear(true, true);
