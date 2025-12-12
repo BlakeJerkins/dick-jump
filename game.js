@@ -43,6 +43,8 @@ let fireCooldown = 250; // ms between shots
 let lastFireTime = 0;
 let enemies; // enemy group
 let enemyBullets; // enemy bullet group
+let hasAutoPistol = false; // upgrade at 25 coins
+let mouseDown = false; // track mouse hold for auto fire
 // Spawn tuning
 const COIN_SPAWN_CHANCE = 0.40;    // 40% of platforms have a coin
 const ENEMY_SPAWN_CHANCE = 0.20;   // 20% of platforms have an enemy (lower than coins)
@@ -242,11 +244,11 @@ function create() {
     enemyGraphics.destroy();
     enemies = this.physics.add.group();
     
-    // Enemy bullets (red, smaller than player bullets)
+    // Enemy bullets (red ball, 3x larger)
     const enemyBulletGraphics = this.make.graphics({ x: 0, y: 0, add: false });
     enemyBulletGraphics.fillStyle(0xff0000, 1); // red
-    enemyBulletGraphics.fillRect(0, 0, 5, 2);
-    enemyBulletGraphics.generateTexture('enemyBulletTexture', 5, 2);
+    enemyBulletGraphics.fillCircle(7.5, 7.5, 7.5); // circle with radius 7.5
+    enemyBulletGraphics.generateTexture('enemyBulletTexture', 15, 15);
     enemyBulletGraphics.destroy();
     enemyBullets = this.physics.add.group({
         defaultKey: 'enemyBulletTexture',
@@ -300,13 +302,12 @@ function create() {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    // Shooting via mouse click
+    // Shooting via mouse click or hold (auto-pistol on hold)
     this.input.on('pointerdown', () => {
-        const now = this.time.now;
-        if (now - lastFireTime >= fireCooldown) {
-            lastFireTime = now;
-            shootBullet.call(this);
-        }
+        mouseDown = true;
+    });
+    this.input.on('pointerup', () => {
+        mouseDown = false;
     });
     
     // UI
@@ -330,12 +331,6 @@ function create() {
     
     // Fetch global high score from server
     fetchGlobalHighScore();
-
-    // Bullet-coin overlap: bullets collect coins
-    this.physics.add.overlap(bullets, coins, (bullet, coin) => {
-        collectCoin(player, coin);
-        bullet.destroy();
-    });
 
     // Bullet-enemy overlap: bullets kill enemies
     this.physics.add.overlap(bullets, enemies, (bullet, enemy) => {
@@ -553,7 +548,15 @@ function update() {
     if (!spaceJustPressed) {
         spacePressed = false;
     }
-    // Mouse click shooting handled via input listener in create()
+    
+    // Handle shooting - click for normal pistol, hold for auto-pistol
+    if (mouseDown) {
+        const now = this.time.now;
+        if (now - lastFireTime >= fireCooldown) {
+            lastFireTime = now;
+            shootBullet.call(this);
+        }
+    }
     
     // Generate new platforms as player moves forward
     if (player.x > lastPlatformX - 400) {
@@ -670,6 +673,33 @@ function collectCoin(player, coin) {
         
         // Reduce platform size by 1% per coin collected (minimum 5%)
         platformSizeMultiplier = Math.max(0.05, 1.0 - (coinsCollected * 0.01));
+        
+        // Upgrade to auto-pistol at 25 coins
+        if (coinsCollected >= 25 && !hasAutoPistol) {
+            hasAutoPistol = true;
+            fireCooldown = 100; // Faster fire rate for auto-pistol
+            console.log('🔫 AUTO-PISTOL UPGRADED! Hold mouse for rapid fire!');
+            
+            // Show upgrade notification on screen
+            if (game.scene.isActive('default')) {
+                const scene = game.scene.getScene('default');
+                const upgradeText = scene.add.text(512, 150, '🔫 AUTO-PISTOL UPGRADED!\nHold mouse button for rapid fire!', {
+                    fontSize: '32px',
+                    fill: '#ffff00',
+                    backgroundColor: '#000000',
+                    align: 'center',
+                    padding: { x: 20, y: 15 }
+                });
+                upgradeText.setOrigin(0.5);
+                upgradeText.setScrollFactor(0);
+                upgradeText.setDepth(101);
+                
+                // Remove text after 10 seconds
+                scene.time.delayedCall(10000, () => {
+                    upgradeText.destroy();
+                });
+            }
+        }
     }
 }
 
