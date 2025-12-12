@@ -216,6 +216,7 @@ function create() {
     // Collisions
     this.physics.add.collider(player, platforms);
     this.physics.add.collider(coins, platforms);
+    this.physics.add.collider(enemies, platforms);  // Enemies stay on platforms
     this.physics.add.overlap(player, coins, collectCoin, null, this);
     
     // Input
@@ -416,11 +417,14 @@ function generateNextPlatform(scene) {
 
     // Occasionally add an enemy that patrols on the platform
     if (Math.random() < ENEMY_SPAWN_CHANCE) {
-        const enemy = enemies.create(platformX - (newPlatform.displayWidth / 4), platformY - 18, 'enemyTexture');
+        const platformHalfWidth = newPlatform.displayWidth / 2;
+        const enemySpawnX = platformX - platformHalfWidth + 15;  // Spawn well within platform bounds
+        const enemy = enemies.create(enemySpawnX, platformY - 18, 'enemyTexture');
         enemy.body.setCollideWorldBounds(false);
         enemy.body.setVelocityX(60);
-        enemy.patrolLeft = platformX - (newPlatform.displayWidth / 2) + 10;
-        enemy.patrolRight = platformX + (newPlatform.displayWidth / 2) - 10;
+        // Set patrol bounds to stay within platform
+        enemy.patrolLeft = platformX - platformHalfWidth + 10;
+        enemy.patrolRight = platformX + platformHalfWidth - 10;
     }
 }
 
