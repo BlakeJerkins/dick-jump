@@ -45,6 +45,8 @@ let enemies; // enemy group
 let enemyBullets; // enemy bullet group
 let hasAutoPistol = false; // upgrade at 25 coins
 let mouseDown = false; // track mouse hold for auto fire
+let mouseX = 512; // track mouse X position for aiming
+let mouseY = 300; // track mouse Y position for aiming
 // Spawn tuning
 const COIN_SPAWN_CHANCE = 0.40;    // 40% of platforms have a coin
 const ENEMY_SPAWN_CHANCE = 0.20;   // 20% of platforms have an enemy (lower than coins)
@@ -308,6 +310,12 @@ function create() {
     });
     this.input.on('pointerup', () => {
         mouseDown = false;
+    });
+    
+    // Track mouse position for aiming
+    this.input.on('pointermove', (pointer) => {
+        mouseX = pointer.x + this.cameras.main.scrollX;
+        mouseY = pointer.y + this.cameras.main.scrollY;
     });
     
     // UI
@@ -710,7 +718,19 @@ function shootBullet() {
     bullet.setActive(true);
     bullet.setVisible(true);
     bullet.body.allowGravity = false;
-    bullet.body.setVelocityX(500);
+    
+    // Calculate direction toward mouse position
+    const dx = mouseX - (player.x + 20);
+    const dy = mouseY - (player.y - 10);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance > 0) {
+        const speed = 500;
+        const velocityX = (dx / distance) * speed;
+        const velocityY = (dy / distance) * speed;
+        bullet.body.setVelocity(velocityX, velocityY);
+    }
+    
     bullet.setDepth(50);
     
     // Auto-destroy after 1500ms
