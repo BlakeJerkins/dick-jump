@@ -47,6 +47,16 @@ let hasAutoPistol = false; // upgrade at 25 coins
 let mouseDown = false; // track mouse hold for auto fire
 let mouseX = 512; // track mouse X position for aiming
 let mouseY = 300; // track mouse Y position for aiming
+let boss; // boss entity
+let bossSpawned = false;
+let bossDefeated = false;
+let bossHealthBarBg;
+let bossHealthBarFill;
+let bossHP = 0;
+let bossMaxHP = 100;
+let portal; // portal to next level
+let level = 1; // current level index
+let stopPlatformGeneration = false;
 // Spawn tuning
 const COIN_SPAWN_CHANCE = 0.40;    // 40% of platforms have a coin
 const ENEMY_SPAWN_CHANCE = 0.20;   // 20% of platforms have an enemy (lower than coins)
@@ -82,6 +92,25 @@ function create() {
     largePlatGraphics.fillRect(0, 0, 120, 20);
     largePlatGraphics.generateTexture('platformLarge', 120, 20);
     largePlatGraphics.destroy();
+
+    // Green platforms for next level
+    const smallPlatGreen = this.make.graphics({ x: 0, y: 0, add: false });
+    smallPlatGreen.fillStyle(0x228B22, 1);
+    smallPlatGreen.fillRect(0, 0, 60, 20);
+    smallPlatGreen.generateTexture('platformSmallGreen', 60, 20);
+    smallPlatGreen.destroy();
+
+    const mediumPlatGreen = this.make.graphics({ x: 0, y: 0, add: false });
+    mediumPlatGreen.fillStyle(0x228B22, 1);
+    mediumPlatGreen.fillRect(0, 0, 90, 20);
+    mediumPlatGreen.generateTexture('platformMediumGreen', 90, 20);
+    mediumPlatGreen.destroy();
+
+    const largePlatGreen = this.make.graphics({ x: 0, y: 0, add: false });
+    largePlatGreen.fillStyle(0x228B22, 1);
+    largePlatGreen.fillRect(0, 0, 120, 20);
+    largePlatGreen.generateTexture('platformLargeGreen', 120, 20);
+    largePlatGreen.destroy();
     
     // Create player sprite (funny 2D penis and balls)
     const playerGraphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -258,8 +287,17 @@ function create() {
     enemyBulletGraphics.destroy();
     enemyBullets = this.physics.add.group({
         defaultKey: 'enemyBulletTexture',
-        maxSize: 100
+        maxSize: 200
     });
+
+    // Portal texture
+    const portalGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    portalGraphics.lineStyle(3, 0x00ffcc, 1);
+    portalGraphics.strokeCircle(20, 20, 16);
+    portalGraphics.lineStyle(2, 0x0099aa, 0.8);
+    portalGraphics.strokeCircle(20, 20, 10);
+    portalGraphics.generateTexture('portalTexture', 40, 40);
+    portalGraphics.destroy();
     
     // Create initial platforms
     platforms.create(100, 500, 'platformMedium');
@@ -290,6 +328,7 @@ function create() {
             player.x = 100;
             player.y = 450;
             player.body.setVelocity(0, 0);
+            resetBossState(this);
             coins.children.entries.forEach(c => c.destroy());
             coins.clear();
             platforms.children.entries.forEach(p => {
@@ -299,11 +338,11 @@ function create() {
                     coin.body.setGravityY(-300);
                 }
             });
-            // Regenerate enemies on platforms similar to coins
+            // Regenerate enemies on platforms similar to coins (skip starting platform)
             enemies.children.entries.forEach(e => e.destroy());
             enemies.clear();
             platforms.children.entries.forEach(newPlatform => {
-                if (Math.random() < ENEMY_SPAWN_CHANCE) {
+                if (Math.random() < ENEMY_SPAWN_CHANCE && Math.abs(newPlatform.x - 100) > 50) {
                     const platformHalfWidth = newPlatform.displayWidth / 2;
                     const enemySpawnX = newPlatform.x - platformHalfWidth + 15;
                     const enemy = enemies.create(enemySpawnX, newPlatform.y - 44, 'enemyTexture');
@@ -358,10 +397,19 @@ function create() {
     // Fetch global high score from server
     fetchGlobalHighScore();
 
-    // Bullet-enemy overlap: bullets kill enemies
+    // Bullet-enemy overlap: bullets damage/kill enemies (boss takes multiple hits)
     this.physics.add.overlap(bullets, enemies, (bullet, enemy) => {
+        if (!bullet || !bullet.active) return;
         bullet.destroy();
-        enemy.destroy();
+        if (enemy && enemy.isBoss) {
+            enemy.hp -= 1;
+            updateBossHealthBar();
+            if (enemy.hp <= 0) {
+                handleBossDefeat.call(this, enemy);
+            }
+        } else if (enemy) {
+            enemy.destroy();
+        }
     });
 
     // Player-enemy collision: death
@@ -379,6 +427,7 @@ function create() {
             player.y = 450;
             player.body.setVelocity(0, 0);
             // Regenerate coins
+            resetBossState(this);
             coins.children.entries.forEach(c => c.destroy());
             coins.clear();
             platforms.children.entries.forEach(p => {
@@ -388,11 +437,11 @@ function create() {
                     coin.body.setGravityY(-300);
                 }
             });
-            // Regenerate enemies
+            // Regenerate enemies (skip starting platform)
             enemies.children.entries.forEach(e => e.destroy());
             enemies.clear();
             platforms.children.entries.forEach(newPlatform => {
-                if (Math.random() < ENEMY_SPAWN_CHANCE) {
+                if (Math.random() < ENEMY_SPAWN_CHANCE && Math.abs(newPlatform.x - 100) > 50) {
                     const platformHalfWidth = newPlatform.displayWidth / 2;
                     const enemySpawnX = newPlatform.x - platformHalfWidth + 15;
                     const enemy = enemies.create(enemySpawnX, newPlatform.y - 44, 'enemyTexture');
@@ -412,6 +461,14 @@ function create() {
     
     // Store scene reference for platform generation
     this.gameScene = this;
+
+    // Expose boss test spawn for quick testing
+    window.spawnBossTest = () => {
+        resetBossState(this);
+        bossDefeated = false;
+        bossSpawned = false;
+        spawnBoss(this);
+    };
 }
 
 function generateNextPlatform(scene) {
@@ -501,15 +558,18 @@ function generateNextPlatform(scene) {
     const sizeRand = Math.random();
     let platformTexture;
     let scaleX;
+    const smallKey = level === 1 ? 'platformSmall' : 'platformSmallGreen';
+    const medKey = level === 1 ? 'platformMedium' : 'platformMediumGreen';
+    const largeKey = level === 1 ? 'platformLarge' : 'platformLargeGreen';
     
     if (sizeRand < 0.33) {
-        platformTexture = 'platformSmall';  // 50% base size
+        platformTexture = smallKey;  // 50% base size
         scaleX = 0.5 * platformSizeMultiplier;
     } else if (sizeRand < 0.66) {
-        platformTexture = 'platformMedium';  // 75% base size
+        platformTexture = medKey;  // 75% base size
         scaleX = 0.75 * platformSizeMultiplier;
     } else {
-        platformTexture = 'platformLarge';  // 100% base size
+        platformTexture = largeKey;  // 100% base size
         scaleX = 1.0 * platformSizeMultiplier;
     }
     
@@ -527,7 +587,8 @@ function generateNextPlatform(scene) {
     }
 
     // Occasionally add an enemy that patrols on the platform
-    if (Math.random() < ENEMY_SPAWN_CHANCE) {
+    // Never spawn on starting platform (x near 100)
+    if (Math.random() < ENEMY_SPAWN_CHANCE && Math.abs(platformX - 100) > 50) {
         const platformHalfWidth = newPlatform.displayWidth / 2;
         const enemySpawnX = platformX - platformHalfWidth + 15;  // Spawn well within platform bounds
         const enemy = enemies.create(enemySpawnX, platformY - 44, 'enemyTexture');  // Adjusted Y for taller enemy
@@ -599,10 +660,15 @@ function update() {
     }
     
     // Generate new platforms as player moves forward
-    if (player.x > lastPlatformX - 400) {
+    if (!stopPlatformGeneration && player.x > lastPlatformX - 400) {
         generateNextPlatform(this);
     }
     
+    // Spawn boss at 30 coins
+    if (!bossSpawned && !bossDefeated && coinsCollected >= 30) {
+        spawnBoss(this);
+    }
+
     // Check if player fell off the screen - DEATH
     if (player.y > 600 && canRespawn) {
         canRespawn = false;
@@ -621,6 +687,7 @@ function update() {
         player.x = 100;
         player.y = 450;
         player.body.setVelocity(0, 0);
+        resetBossState(this);
         
         // Regenerate coins on all platforms
         coins.children.entries.forEach(coin => coin.destroy());
@@ -632,11 +699,11 @@ function update() {
                 coin.body.setGravityY(-300);
             }
         });
-        // Regenerate enemies on all platforms
+        // Regenerate enemies on all platforms (skip starting platform)
         enemies.children.entries.forEach(e => e.destroy());
         enemies.clear();
         platforms.children.entries.forEach(newPlatform => {
-            if (Math.random() < ENEMY_SPAWN_CHANCE) {
+            if (Math.random() < ENEMY_SPAWN_CHANCE && Math.abs(newPlatform.x - 100) > 50) {
                 const platformHalfWidth = newPlatform.displayWidth / 2;
                 const enemySpawnX = newPlatform.x - platformHalfWidth + 15;
                 const enemy = enemies.create(enemySpawnX, newPlatform.y - 44, 'enemyTexture');
@@ -653,8 +720,12 @@ function update() {
         });
     }
 
-    // Enemy patrol and shooting update
+    // Enemy patrol and shooting update (boss handled separately)
     enemies.children.entries.forEach(enemy => {
+        if (enemy.isBoss) {
+            updateBoss(enemy, this);
+            return;
+        }
         // Patrol behavior
         if (enemy.x <= enemy.patrolLeft) {
             enemy.body.setVelocityX(60);
@@ -748,6 +819,201 @@ function fireEnemyBullet(enemy, scene) {
     scene.time.delayedCall(2000, () => {
         if (bullet.active) bullet.destroy();
     });
+}
+
+// Boss logic
+function spawnBoss(scene) {
+    const platformsList = platforms.children.entries;
+    if (!platformsList.length) return;
+    // Pick the lowest platform (max Y) as baseline for boss platform height
+    const basePlatform = platformsList.reduce((best, p) => (p.y > best.y ? p : best), platformsList[0]);
+    bossSpawned = true;
+    bossDefeated = false;
+    bossMaxHP = 50;
+    bossHP = bossMaxHP;
+    // Create dedicated boss platform (350px wide) ahead of player at lowest height
+    const bossTex = level === 1 ? 'platformLarge' : 'platformLargeGreen';
+    const bossPlatWidth = 350;
+    const baseWidth = 120; // platformLarge native width
+    const scaleX = bossPlatWidth / baseWidth;
+    const spawnPlatformX = Math.max(basePlatform.x + 200, player.x + 200);
+    const spawnPlatformY = basePlatform.y; // lowest possible platform height
+    const bossPlatform = platforms.create(spawnPlatformX, spawnPlatformY, bossTex);
+    bossPlatform.setScale(scaleX, 1);
+    bossPlatform.refreshBody();
+    
+    // Remove any platforms directly above the boss platform
+    const platformsToDel = platformsList.filter(p => 
+        p !== bossPlatform &&
+        Math.abs(p.x - bossPlatform.x) < bossPlatWidth &&
+        p.y < bossPlatform.y
+    );
+    platformsToDel.forEach(p => p.destroy());
+    lastPlatformX = spawnPlatformX;
+    platformDistance = 0;
+
+    const platformHalfWidth = bossPlatWidth / 2;
+    const spawnX = bossPlatform.x;
+    const spawnY = bossPlatform.y - 30;
+    boss = enemies.create(spawnX, spawnY, 'enemyTexture');
+    boss.setScale(4);
+    boss.isBoss = true;
+    boss.hp = bossMaxHP;
+    boss.body.setBounce(0);
+    boss.body.setCollideWorldBounds(false);
+    boss.body.setVelocityX(60);
+    boss.patrolLeft = bossPlatform.x - platformHalfWidth + 20;
+    boss.patrolRight = bossPlatform.x + platformHalfWidth - 20;
+    // Set hitbox to match the visible enemy sprite scaled by 4
+    // Enemy sprite is 20x44, scaled 4x = 80x176
+    // Center the hitbox on the sprite origin
+    boss.body.setSize(80, 176);
+    boss.body.setOffset(-40, -88);
+    // Initialize boss HP and 2 second delay before first shot
+    boss.hp = bossMaxHP;
+    boss.lastShotTime = scene.time.now + 2000;
+    // Kill surrounding lower-level enemies
+    const killRadius = 400;
+    enemies.children.entries.forEach(e => {
+        if (e.isBoss) return; // don't kill the boss
+        const dist = Phaser.Math.Distance.Between(e.x, e.y, spawnX, spawnY);
+        if (dist < killRadius) {
+            e.destroy();
+        }
+    });
+    createBossHealthBar(scene);
+}
+
+function updateBoss(bossEntity, scene) {
+    if (!bossEntity.active) return;
+    if (bossEntity.x <= bossEntity.patrolLeft) {
+        bossEntity.x = bossEntity.patrolLeft;
+        bossEntity.body.setVelocityX(80);
+    } else if (bossEntity.x >= bossEntity.patrolRight) {
+        bossEntity.x = bossEntity.patrolRight;
+        bossEntity.body.setVelocityX(-80);
+    }
+
+    if (!bossEntity.lastShotTime) bossEntity.lastShotTime = 0;
+    const now = scene.time.now;
+    const shootCooldown = 800;
+    if (now - bossEntity.lastShotTime >= shootCooldown) {
+        bossEntity.lastShotTime = now;
+        fireBossShotgun(bossEntity, scene);
+    }
+}
+
+function fireBossShotgun(bossEntity, scene) {
+    const baseDx = player.x - bossEntity.x;
+    const baseDy = player.y - bossEntity.y;
+    const baseAngle = Math.atan2(baseDy, baseDx);
+    const angles = [-0.2, 0, 0.2]; // reduced spread and pellet count for fairness
+    const speed = 260;
+    angles.forEach(offset => {
+        const ang = baseAngle + offset;
+        const vx = Math.cos(ang) * speed;
+        const vy = Math.sin(ang) * speed;
+        const pellet = enemyBullets.get(bossEntity.x, bossEntity.y, 'enemyBulletTexture');
+        if (!pellet) return;
+        pellet.setActive(true);
+        pellet.setVisible(true);
+        pellet.body.allowGravity = false;
+        if (pellet.body && pellet.body.setCircle) {
+            pellet.body.setCircle(6);
+            pellet.body.setOffset(4, 4);
+        }
+        pellet.body.setVelocity(vx, vy);
+        pellet.setDepth(55);
+        scene.time.delayedCall(2000, () => {
+            if (pellet.active) pellet.destroy();
+        });
+    });
+}
+
+function createBossHealthBar(scene) {
+    if (bossHealthBarBg) bossHealthBarBg.destroy();
+    if (bossHealthBarFill) bossHealthBarFill.destroy();
+    const barX = scene.cameras.main.width - 220;
+    const barY = 50;
+    bossHealthBarBg = scene.add.rectangle(barX, barY, 240, 24, 0x550000);
+    bossHealthBarFill = scene.add.rectangle(barX, barY, 240, 24, 0xff0000);
+    bossHealthBarBg.setScrollFactor(0);
+    bossHealthBarFill.setScrollFactor(0);
+    bossHealthBarBg.setDepth(100);
+    bossHealthBarFill.setDepth(101);
+    updateBossHealthBar();
+}
+
+function updateBossHealthBar() {
+    if (!bossHealthBarFill || !bossHealthBarBg || bossMaxHP <= 0) return;
+    const pct = Phaser.Math.Clamp(bossHP / bossMaxHP, 0, 1);
+    bossHealthBarFill.displayWidth = 240 * pct;
+    bossHealthBarFill.visible = bossSpawned && bossHP > 0;
+    bossHealthBarBg.visible = bossSpawned && bossHP > 0;
+}
+
+function handleBossDefeat(scene, bossEntity) {
+    if (bossEntity && bossEntity.active) bossEntity.destroy();
+    boss = null;
+    bossDefeated = true;
+    bossSpawned = false;
+    stopPlatformGeneration = true;
+    if (bossHealthBarBg) { bossHealthBarBg.destroy(); bossHealthBarBg = null; }
+    if (bossHealthBarFill) { bossHealthBarFill.destroy(); bossHealthBarFill = null; }
+    spawnPortal(scene);
+}
+
+function spawnPortal(scene) {
+    const targetPlatform = platforms.children.entries.reduce((best, p) => {
+        if (!best) return p;
+        return Math.abs(p.x - player.x) < Math.abs(best.x - player.x) ? p : best;
+    }, null);
+    const portalX = targetPlatform ? targetPlatform.x + 120 : player.x + 150;
+    const portalY = targetPlatform ? targetPlatform.y - 40 : 420;
+    if (portal) portal.destroy();
+    portal = scene.physics.add.sprite(portalX, portalY, 'portalTexture');
+    portal.body.setAllowGravity(false);
+    portal.setDepth(90);
+    scene.physics.add.overlap(player, portal, () => {
+        goToNextLevel(scene);
+    });
+}
+
+function resetBossState(scene) {
+    if (boss && boss.active) boss.destroy();
+    boss = null;
+    bossSpawned = false;
+    bossDefeated = false;
+    stopPlatformGeneration = false;
+    if (portal) { portal.destroy(); portal = null; }
+    if (bossHealthBarBg) { bossHealthBarBg.destroy(); bossHealthBarBg = null; }
+    if (bossHealthBarFill) { bossHealthBarFill.destroy(); bossHealthBarFill = null; }
+}
+
+function goToNextLevel(scene) {
+    level = 2;
+    stopPlatformGeneration = false;
+    if (portal) { portal.destroy(); portal = null; }
+    if (bossHealthBarBg) { bossHealthBarBg.destroy(); bossHealthBarBg = null; }
+    if (bossHealthBarFill) { bossHealthBarFill.destroy(); bossHealthBarFill = null; }
+    enemies.clear(true, true);
+    enemyBullets.clear(true, true);
+    coins.clear(true, true);
+    platforms.clear(true, true);
+    boss = null;
+    bossSpawned = false;
+    bossDefeated = true;
+    const startPlatform = platforms.create(100, 500, 'platformMediumGreen');
+    startPlatform.setScale(platformSizeMultiplier, 1);
+    startPlatform.refreshBody();
+    lastPlatformX = 100;
+    platformDistance = 0;
+    for (let i = 0; i < 3; i++) {
+        generateNextPlatform(scene);
+    }
+    player.x = 100;
+    player.y = 450;
+    player.body.setVelocity(0, 0);
 }
 
 function collectCoin(player, coin) {

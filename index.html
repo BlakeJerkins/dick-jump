@@ -58,9 +58,21 @@
         SPACE to jump (double jump available!)<br>
         Collect coins for a high score!
     </div>
+    <button id="spawn-boss-btn" style="position:absolute; top:10px; right:10px; z-index:101; padding:8px 12px; font-size:14px; font-weight:bold; cursor:pointer;">Spawn Boss</button>
     <div id="game-container"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
     <script src="game.js"></script>
+    <script>
+        // Hook up the spawn boss button for quick testing
+        const btn = document.getElementById('spawn-boss-btn');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                if (window.spawnBossTest) {
+                    window.spawnBossTest();
+                }
+            });
+        }
+    </script>
 </body>
 </html>
