@@ -1,6 +1,6 @@
-# Simple 2D Platformer Game
+# Dick Jump
 
-A fun, easy-to-play 2D platformer game built with Phaser and JavaScript. No installation required!
+A simple 2D platformer built with Phaser and a Node.js backend for global high scores.
 
 ## How to Play
 
@@ -10,12 +10,6 @@ A fun, easy-to-play 2D platformer game built with Phaser and JavaScript. No inst
 
 ## Game Features
 
-- Infinite procedurally-generated platforms
-- Double jump mechanics for advanced platforming
-- Coins to collect for points
-- Progressive difficulty - platforms shrink as you collect coins
-- **Global High Score Tracking** - Compete with all players!
-- Variable platform sizes for increased challenge
 
 ## How to Run
 
@@ -26,7 +20,6 @@ Simply open `index.html` in your web browser. That's it!
 ### Option 2: Run with Global High Score Tracking (Recommended)
 
 #### Prerequisites
-- Node.js installed ([Download here](https://nodejs.org/))
 
 #### Setup
 1. Open a terminal in this folder
@@ -91,22 +84,35 @@ platformer/
 ## Customization Ideas
 
 Want to make it your own? Try:
-- Change player color: Modify `0xff0000` in game.js
-- Add more platforms: Add more `platforms.create()` calls
-- Change coin positions: Modify the `coinPositions` array
-- Adjust gravity: Change `gravity: { y: 300 }` value
-- Add sound effects: Use Phaser's audio system
-- Create different levels: Duplicate the game and change layouts
 
 ## Technical Details
 
-- **Framework**: Phaser 3
-- **Language**: JavaScript (ES6)
-- **Browser**: All modern browsers (Chrome, Firefox, Safari, Edge)
-- **Dependencies**: None! (Phaser loaded from CDN)
 
 ## Tips for Sharing
 
 Share this link with your friends - they can play it right in their browser with no setup!
 
 Enjoy! 🎮
+
+## Deploying to Render (Auto-deploy on push)
+
+The app is configured for Render via `render.yaml` and `server.js` uses `process.env.PORT`.
+
+Steps:
+- Push to the `main` branch on GitHub. Render will auto-deploy.
+- Initial setup (one-time):
+   - Create a Web Service on Render and connect your GitHub repo `BlakeJerkins/dick-jump`.
+   - Runtime: Node
+   - Build command: `npm install`
+   - Start command: `npm start`
+   - Plan: Free
+   - Auto-deploy: Enabled
+
+After each push to `main`, your service redeploys automatically. Check status at the Render dashboard under Deploys.
+
+## Copilot Instructions (Deploy Helper)
+
+- Use relative API paths in the frontend (e.g., `fetch('/api/highscore')`) so deployment works on any host.
+- Ensure the server binds to `process.env.PORT`.
+- To deploy updates: commit to `main` and push; confirm on Render dashboard.
+- Trouble? Verify logs on Render, and confirm build/start commands match `package.json` scripts.
