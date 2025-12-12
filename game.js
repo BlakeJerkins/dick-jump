@@ -671,8 +671,14 @@ function updateEnemyShooting(enemy, scene) {
     // Initialize shooting cooldown if not set
     if (!enemy.lastShotTime) {
         enemy.lastShotTime = 0;
-        enemy.shootCooldown = 800; // ms between enemy shots
+        enemy.baseShootCooldown = 800; // base ms between enemy shots
+        enemy.shootCooldown = enemy.baseShootCooldown;
     }
+    // Scale rate of fire: every 10 coins, increase by 0.2x (faster)
+    // cooldown = base * (1 - 0.2 * floor(coinsCollected/10)), min 200ms
+    const tiers = Math.floor(coinsCollected / 10);
+    const rofMultiplier = Math.max(0.25, 1 - 0.2 * tiers);
+    enemy.shootCooldown = Math.max(200, enemy.baseShootCooldown * rofMultiplier);
     
     // Check if player is within range (detect within ~300 pixels)
     const distToPlayer = Phaser.Math.Distance.Between(enemy.x, enemy.y, player.x, player.y);
@@ -690,6 +696,26 @@ function updateEnemyShooting(enemy, scene) {
 }
 
 function fireEnemyBullet(enemy, scene) {
+    // If jumping upgrade active, attempt periodic jump
+    if (coinsCollected >= 25) {
+        if (!enemy.lastJumpTime) enemy.lastJumpTime = 0;
+        const now = scene.time.now;
+        const jumpInterval = 1500; // ms
+        if (now - enemy.lastJumpTime >= jumpInterval && enemy.body && enemy.body.touching.down) {
+            enemy.lastJumpTime = now;
+            // Vertical jump while preserving patrol; ensure horizontal stays within bounds
+            enemy.body.setVelocityY(-360);
+        }
+        // Constrain enemy within patrol bounds during/after jump
+        if (enemy.x <= enemy.patrolLeft) {
+            enemy.x = enemy.patrolLeft;
+            enemy.body.setVelocityX(60);
+        } else if (enemy.x >= enemy.patrolRight) {
+            enemy.x = enemy.patrolRight;
+            enemy.body.setVelocityX(-60);
+        }
+    }
+
     // Determine direction toward player
     const dx = player.x - enemy.x;
     const dy = player.y - enemy.y;
@@ -743,7 +769,7 @@ function collectCoin(player, coin) {
             // Show upgrade notification under the title (top-center)
             if (game.scene.isActive('default')) {
                 const scene = game.scene.getScene('default');
-                const upgradeText = scene.add.text(512, 90, '🔫 AUTO-PISTOL UPGRADED!\nHold mouse button for rapid fire!', {
+                const upgradeText = scene.add.text(562, 90, '🔫 AUTO-PISTOL UPGRADED!\nHold mouse button for rapid fire!', {
                     fontSize: '32px',
                     fill: '#ffff00',
                     backgroundColor: '#000000',
@@ -754,8 +780,8 @@ function collectCoin(player, coin) {
                 upgradeText.setScrollFactor(0);
                 upgradeText.setDepth(101);
                 
-                // Remove text after 10 seconds
-                scene.time.delayedCall(10000, () => {
+                // Remove text after 3 seconds
+                scene.time.delayedCall(3000, () => {
                     upgradeText.destroy();
                 });
             }
