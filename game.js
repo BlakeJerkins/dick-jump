@@ -688,10 +688,10 @@ function collectCoin(player, coin) {
             fireCooldown = 100; // Faster fire rate for auto-pistol
             console.log('🔫 AUTO-PISTOL UPGRADED! Hold mouse for rapid fire!');
             
-            // Show upgrade notification on screen
+            // Show upgrade notification under the title (top-center)
             if (game.scene.isActive('default')) {
                 const scene = game.scene.getScene('default');
-                const upgradeText = scene.add.text(512, 150, '🔫 AUTO-PISTOL UPGRADED!\nHold mouse button for rapid fire!', {
+                const upgradeText = scene.add.text(512, 90, '🔫 AUTO-PISTOL UPGRADED!\nHold mouse button for rapid fire!', {
                     fontSize: '32px',
                     fill: '#ffff00',
                     backgroundColor: '#000000',
