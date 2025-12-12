@@ -93,15 +93,19 @@ function create() {
     playerGraphics.fillCircle(14, 12, 1.5);
     playerGraphics.fillCircle(18, 12, 1.5);
     
-    // Draw a small pixel glock (black) attached to the right side
-    // handle
-    playerGraphics.fillRect(22, 22, 3, 6);
-    // trigger guard
-    playerGraphics.fillRect(21, 22, 2, 2);
+    // Draw a small pixel pistol (silver) attached to the right side
+    // base silver color
+    playerGraphics.fillStyle(0xC0C0C0, 1); // silver
     // slide/barrel
     playerGraphics.fillRect(20, 18, 10, 4);
-    // muzzle highlight
-    playerGraphics.fillStyle(0x444444, 1);
+    // handle darker gray
+    playerGraphics.fillStyle(0xA9A9A9, 1); // dark gray
+    playerGraphics.fillRect(22, 22, 3, 6);
+    // trigger guard (medium gray)
+    playerGraphics.fillStyle(0xB0B0B0, 1);
+    playerGraphics.fillRect(21, 22, 2, 2);
+    // muzzle highlight brighter
+    playerGraphics.fillStyle(0xFFFFFF, 1);
     playerGraphics.fillRect(29, 18, 1, 4);
     
     playerGraphics.generateTexture('playerTexture', 32, 48);
