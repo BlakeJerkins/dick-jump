@@ -195,11 +195,26 @@ function create() {
         maxSize: 50
     });
 
-    // Enemies (pink blocks)
+    // Enemies (cartoon vagina shape - pink, double height)
     const enemyGraphics = this.make.graphics({ x: 0, y: 0, add: false });
-    enemyGraphics.fillStyle(0xff69b4, 1); // pink
-    enemyGraphics.fillRect(0, 0, 20, 16);
-    enemyGraphics.generateTexture('enemyTexture', 20, 16);
+    enemyGraphics.fillStyle(0xff1493, 1); // deep pink
+    // Main body - rounded bottom like vulva
+    enemyGraphics.fillRect(2, 6, 16, 22);
+    // Top mound
+    enemyGraphics.fillCircle(10, 8, 8);
+    // Inner folds - darker pink
+    enemyGraphics.fillStyle(0xff69b4, 1); // hot pink for detail
+    enemyGraphics.fillRect(8, 14, 4, 12);
+    enemyGraphics.fillCircle(10, 16, 2);
+    // Side curves for vulva lips
+    enemyGraphics.fillStyle(0xd91e63, 1); // darker pink
+    enemyGraphics.beginPath();
+    enemyGraphics.arc(4, 18, 3, 0, Math.PI * 2);
+    enemyGraphics.fill();
+    enemyGraphics.beginPath();
+    enemyGraphics.arc(16, 18, 3, 0, Math.PI * 2);
+    enemyGraphics.fill();
+    enemyGraphics.generateTexture('enemyTexture', 20, 32);
     enemyGraphics.destroy();
     enemies = this.physics.add.group();
     
@@ -419,7 +434,7 @@ function generateNextPlatform(scene) {
     if (Math.random() < ENEMY_SPAWN_CHANCE) {
         const platformHalfWidth = newPlatform.displayWidth / 2;
         const enemySpawnX = platformX - platformHalfWidth + 15;  // Spawn well within platform bounds
-        const enemy = enemies.create(enemySpawnX, platformY - 18, 'enemyTexture');
+        const enemy = enemies.create(enemySpawnX, platformY - 32, 'enemyTexture');  // Adjusted Y for taller enemy
         enemy.body.setCollideWorldBounds(false);
         enemy.body.setVelocityX(60);
         // Set patrol bounds to stay within platform
