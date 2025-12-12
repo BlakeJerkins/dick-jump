@@ -447,7 +447,7 @@ function winGame(player, flag) {
 // Fetch global high score from server
 async function fetchGlobalHighScore() {
     try {
-        const response = await fetch('http://localhost:3000/api/highscore');
+        const response = await fetch('/api/highscore');
         const data = await response.json();
         globalHighScore = data.globalHighScore;
         if (highScoreText) {
@@ -469,7 +469,7 @@ async function fetchGlobalHighScore() {
 // Submit score to server
 async function submitScore(score) {
     try {
-        const response = await fetch('http://localhost:3000/api/highscore', {
+        const response = await fetch('/api/highscore', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
