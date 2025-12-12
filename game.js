@@ -197,23 +197,39 @@ function create() {
 
     // Enemies (cartoon vagina shape - pink, double height)
     const enemyGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    // Main body - triangle/diamond shape
     enemyGraphics.fillStyle(0xff1493, 1); // deep pink
-    // Main body - rounded bottom like vulva
-    enemyGraphics.fillRect(2, 6, 16, 22);
-    // Top mound
-    enemyGraphics.fillCircle(10, 8, 8);
-    // Inner folds - darker pink
-    enemyGraphics.fillStyle(0xff69b4, 1); // hot pink for detail
-    enemyGraphics.fillRect(8, 14, 4, 12);
-    enemyGraphics.fillCircle(10, 16, 2);
-    // Side curves for vulva lips
-    enemyGraphics.fillStyle(0xd91e63, 1); // darker pink
     enemyGraphics.beginPath();
-    enemyGraphics.arc(4, 18, 3, 0, Math.PI * 2);
+    enemyGraphics.moveTo(10, 0);     // top point
+    enemyGraphics.lineTo(2, 12);     // left side
+    enemyGraphics.lineTo(4, 28);     // left bottom
+    enemyGraphics.lineTo(10, 32);    // bottom center
+    enemyGraphics.lineTo(16, 28);    // right bottom
+    enemyGraphics.lineTo(18, 12);    // right side
+    enemyGraphics.closePath();
+    enemyGraphics.fill();
+    
+    // Inner fold - darker pink for contrast
+    enemyGraphics.fillStyle(0xff69b4, 1);
+    enemyGraphics.beginPath();
+    enemyGraphics.moveTo(10, 8);
+    enemyGraphics.lineTo(7, 16);
+    enemyGraphics.lineTo(8, 24);
+    enemyGraphics.lineTo(10, 28);
+    enemyGraphics.lineTo(12, 24);
+    enemyGraphics.lineTo(13, 16);
+    enemyGraphics.closePath();
+    enemyGraphics.fill();
+    
+    // Left and right lips
+    enemyGraphics.fillStyle(0xdb7093, 1); // pale violet red
+    enemyGraphics.beginPath();
+    enemyGraphics.arc(4, 18, 2.5, 0, Math.PI * 2);
     enemyGraphics.fill();
     enemyGraphics.beginPath();
-    enemyGraphics.arc(16, 18, 3, 0, Math.PI * 2);
+    enemyGraphics.arc(16, 18, 2.5, 0, Math.PI * 2);
     enemyGraphics.fill();
+    
     enemyGraphics.generateTexture('enemyTexture', 20, 32);
     enemyGraphics.destroy();
     enemies = this.physics.add.group();
